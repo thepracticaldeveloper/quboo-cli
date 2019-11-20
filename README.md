@@ -13,7 +13,7 @@ Since this tool is mainly intended to be executed from a container, you need Doc
 The basic usage is as follows:
 
 ```bash
-docker run -it -e QUBOO_ACCESS_KEY -e QUBOO_SECRET_KEY -e QUBOO_PLAYER_USERNAME=[player-alias] mechero/quboo-cli:latest release|documentation|(number) "[description]"
+docker run -it -e QUBOO_ACCESS_KEY -e QUBOO_SECRET_KEY -e QUBOO_PLAYER_USERNAME=[player-alias] mechero/quboo-cli:latest quboo release|documentation|(number) "[description]"
 ```
 
 As you see, this command line assumes you have set both keys (access and secret) already as environment variables, therefore you don't need to set them in the command but only reference.
@@ -21,13 +21,13 @@ As you see, this command line assumes you have set both keys (access and secret)
 For example, you can give score to the user with login `johndoe` following the Release use case in the Quboo docs.
 
 ```bash
-docker run -it -e QUBOO_ACCESS_KEY -e QUBOO_SECRET_KEY -e QUBOO_PLAYER_USERNAME=johndoe mechero/quboo-cli:latest release "Front-end release"
+docker run -it -e QUBOO_ACCESS_KEY -e QUBOO_SECRET_KEY -e QUBOO_PLAYER_USERNAME=johndoe mechero/quboo-cli:latest quboo release "Front-end release"
 ```
 
 Or you could give him 25 points because you designed your own game (generic score):
 
 ```bash
-docker run -it -e QUBOO_ACCESS_KEY -e QUBOO_SECRET_KEY -e QUBOO_PLAYER_USERNAME=johndoe mechero/quboo-cli:latest 25 "Coaching and pair programming"
+docker run -it -e QUBOO_ACCESS_KEY -e QUBOO_SECRET_KEY -e QUBOO_PLAYER_USERNAME=johndoe mechero/quboo-cli:latest quboo 25 "Coaching and pair programming"
 ```
 
 ## Integration with existing CI/CD tools
