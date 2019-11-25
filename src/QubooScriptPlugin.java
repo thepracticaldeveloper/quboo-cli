@@ -21,7 +21,6 @@ public class QubooScriptPlugin {
     private static final String QUBOO_API_SERVER = "https://api.quboo.io";
 
     public static void main(String[] args) {
-        System.out.println("Last committer is " + getLastGitCommitterFromGit());
         // Check if the auth env vars are properly set
         final String accessKey = System.getenv(ENV_ACCESS_KEY);
         final String secretKey = System.getenv(ENV_SECRET_KEY);
@@ -119,9 +118,9 @@ public class QubooScriptPlugin {
 
     static String getLastGitCommitterFromGit() {
         try {
-            final InputStream is = Runtime.getRuntime().exec("git log -1 --pretty=format:'%an'").getInputStream();
+            final InputStream is = Runtime.getRuntime().exec("git log -1 --pretty=format:%an").getInputStream();
             final Scanner scanner = new Scanner(is).useDelimiter("\\A");
-            return scanner.hasNext() ? scanner.next() : null;
+            return scanner.hasNext() ? scanner.next().replaceAll(" ", "_") : null;
         } catch (IOException e) {
             e.printStackTrace();
             return null;
