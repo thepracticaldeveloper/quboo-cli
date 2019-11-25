@@ -1,7 +1,10 @@
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.Scanner;
 
 public class QubooScriptPlugin {
 
@@ -18,6 +21,7 @@ public class QubooScriptPlugin {
     private static final String QUBOO_API_SERVER = "https://api.quboo.io";
 
     public static void main(String[] args) {
+        System.out.println("Last committer is " + getLastGitCommitterFromGit());
         // Check if the auth env vars are properly set
         final String accessKey = System.getenv(ENV_ACCESS_KEY);
         final String secretKey = System.getenv(ENV_SECRET_KEY);
@@ -41,15 +45,16 @@ public class QubooScriptPlugin {
             playerName = gitlabUsername;
             uniqueId = System.getenv(ENV_GITLAB_UNIQUE_ID);
         } else if (circleUsername != null) {
-            playerName = circleUsername;
+            // In CircleCI it's possible that you get a blank user if the committer is not a CircleCI user as well
+            playerName = circleUsername.isBlank() ? getLastGitCommitterFromGit() : circleUsername;
             uniqueId = System.getenv(ENV_CIRCLE_UNIQUE_ID);
         }
-        if (playerName == null) {
+        if (playerName == null || playerName.isBlank()) {
             System.out.println("The script could not derive the player name from environment variables. Please use " +
                     ENV_QUBOO_USERNAME + " to specify the player that will get the Quboo score.");
             System.exit(1);
         }
-        if (uniqueId == null) {
+        if (uniqueId == null || uniqueId.isBlank()) {
             uniqueId = String.valueOf(System.nanoTime());
             System.out.println("WARNING: The script could not get a unique id from environment variables. Please use " +
                     ENV_QUBOO_UNIQUE_ID + ", otherwise you will be duplicating the score in future executions.");
@@ -99,14 +104,27 @@ public class QubooScriptPlugin {
             final HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() == 200) {
                 System.out.println("Score added succesfully. Response: " + response.body());
+            } else if (response.statusCode() == 403) {
+                System.err.println("Forbidden access to Quboo server. Please verify your access and secret keys.");
             } else {
-                System.err.println("Got error response from server. Response: " + response.body());
+                System.err.println("Got error response from server (" + response.statusCode() + "). Body: " + response.body());
                 System.exit(1);
             }
         } catch (final Exception e) {
             System.err.println("Could not send score to Quboo. Please check your connectivity and also proper usage of CLI.");
             System.err.println("Reason: " + e.getMessage());
             System.exit(1);
+        }
+    }
+
+    static String getLastGitCommitterFromGit() {
+        try {
+            final InputStream is = Runtime.getRuntime().exec("git log -1 --pretty=format:'%an'").getInputStream();
+            final Scanner scanner = new Scanner(is).useDelimiter("\\A");
+            return scanner.hasNext() ? scanner.next() : null;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
         }
     }
 
