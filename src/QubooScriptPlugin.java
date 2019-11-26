@@ -4,6 +4,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.Optional;
 import java.util.Scanner;
 
 public class QubooScriptPlugin {
@@ -15,8 +16,9 @@ public class QubooScriptPlugin {
     private static final String ENV_GITLAB_USERNAME = "GITLAB_USER_LOGIN";
     private static final String ENV_CIRCLE_USERNAME = "CIRCLE_USERNAME";
     private static final String ENV_QUBOO_UNIQUE_ID = "QUBOO_UNIQUE_ID";
-    private static final String ENV_GITLAB_UNIQUE_ID = "CI_PIPELINE_ID";
-    private static final String ENV_CIRCLE_UNIQUE_ID = "CIRCLE_BUILD_NUM";
+
+    // Pass this variable as 'true' if you want to use always git usernames in Quboo
+    private static final String ENV_ALWAYS_USE_GIT = "QUBOO_CONFIG_ALWAYS_USE_GIT";
 
     private static final String QUBOO_API_SERVER = "https://api.quboo.io";
 
@@ -30,24 +32,37 @@ public class QubooScriptPlugin {
             System.exit(1);
         }
 
+        // Configuration
+        final boolean alwaysUseGit = Optional.ofNullable(System.getenv(ENV_ALWAYS_USE_GIT))
+                .map(Boolean::parseBoolean).orElse(false);
+
         // Detect the player and unique id using the CI tool vars or manual env var
         final String genericUsername = System.getenv(ENV_QUBOO_USERNAME);
         final String gitlabUsername = System.getenv(ENV_GITLAB_USERNAME);
         final String circleUsername = System.getenv(ENV_CIRCLE_USERNAME);
 
-        String playerName = null;
-        String uniqueId = null;
-        if (genericUsername != null) {
+        String playerName;
+        if (alwaysUseGit) { // if set to true, it overrides any other env var
+            playerName = getLastGitCommitterFromGit();
+        } else if (genericUsername != null) {
             playerName = genericUsername;
-            uniqueId = System.getenv(ENV_QUBOO_UNIQUE_ID);
-        } else if (gitlabUsername != null) {
+        } else if (gitlabUsername != null && !gitlabUsername.isBlank()) {
             playerName = gitlabUsername;
-            uniqueId = System.getenv(ENV_GITLAB_UNIQUE_ID);
-        } else if (circleUsername != null) {
+        } else if (circleUsername != null && !circleUsername.isBlank()) {
             // In CircleCI it's possible that you get a blank user if the committer is not a CircleCI user as well
-            playerName = circleUsername.isBlank() ? getLastGitCommitterFromGit() : circleUsername;
-            uniqueId = System.getenv(ENV_CIRCLE_UNIQUE_ID);
+            playerName = circleUsername;
+        } else {
+            playerName = getLastGitCommitterFromGit();
         }
+
+        String uniqueId;
+        final String qubooUniqueId = System.getenv(ENV_QUBOO_UNIQUE_ID);
+        if (qubooUniqueId != null && !qubooUniqueId.isBlank()) {
+            uniqueId = qubooUniqueId;
+        } else {
+            uniqueId = getLastGitHashFromGit();
+        }
+
         if (playerName == null || playerName.isBlank()) {
             System.out.println("The script could not derive the player name from environment variables. Please use " +
                     ENV_QUBOO_USERNAME + " to specify the player that will get the Quboo score.");
@@ -55,7 +70,7 @@ public class QubooScriptPlugin {
         }
         if (uniqueId == null || uniqueId.isBlank()) {
             uniqueId = String.valueOf(System.nanoTime());
-            System.out.println("WARNING: The script could not get a unique id from environment variables. Please use " +
+            System.out.println("WARNING: The script could not get a unique id from environment variable or git. Please use " +
                     ENV_QUBOO_UNIQUE_ID + ", otherwise you will be duplicating the score in future executions.");
         }
 
@@ -127,4 +142,14 @@ public class QubooScriptPlugin {
         }
     }
 
+    static String getLastGitHashFromGit() {
+        try {
+            final InputStream is = Runtime.getRuntime().exec("git log -1 --pretty=format:%h").getInputStream();
+            final Scanner scanner = new Scanner(is).useDelimiter("\\A");
+            return scanner.hasNext() ? scanner.next() : null;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
 }
